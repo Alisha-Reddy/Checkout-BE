@@ -29,8 +29,8 @@ export class StripeService {
               },
             ],
             mode: 'payment',
-            success_url: `http://localhost:3000`,
-            cancel_url: `http://localhost:3000`,
+            success_url: `https://checkout-fe.onrender.com/`,
+            cancel_url: `https://checkout-fe.onrender.com/`,
           });
           return session.url;
         } catch (error) {
