@@ -15,7 +15,7 @@ export class StripeService {
     async createCheckoutSession(amount: number, paymentPeriod: string): Promise<string> {
         try {
           const session = await this.stripe.checkout.sessions.create({
-            // payment_method_types: ['card', 'acss_debit','affirm','amazon_pay','wechat_pay','alipay'],
+            payment_method_types: ['card', 'acss_debit','affirm','amazon_pay','wechat_pay','alipay', 'cashapp','alipay'],
             line_items: [
               {
                 price_data: {
