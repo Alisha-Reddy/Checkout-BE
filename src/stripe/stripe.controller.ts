@@ -1,16 +1,19 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Headers, Req } from '@nestjs/common';
 import { StripeService } from './stripe.service';
 
 @Controller('stripe')
 export class StripeController {
-    constructor(private readonly stripeService: StripeService){}
+    constructor(
+        private readonly stripeService: StripeService,
+    ){}
 
     @Post('create-checkout-session')
     async createCheckoutSession(
         @Body('amount') amount: number,
         @Body('paymentPeriod') paymentPeriod: string,
-    ){
-        return this.stripeService.createCheckoutSession(amount, paymentPeriod)
+        @Body('userId') userId: string,
+    ) {
+        return this.stripeService.createCheckoutSession(amount, paymentPeriod, userId)
     }
 
     @Post('create-payment-intent')
@@ -21,4 +24,14 @@ export class StripeController {
     ) {
         return this.stripeService.createPaymentWithConfiguration(amount, paymentPeriod, paymentMethodConfigurationId);
     }
+
+    @Post('webhook')
+  async handleStripeWebhook(
+    @Req() req: Request,
+    @Headers('stripe-signature') signature: string,
+  ) {
+    // Call Stripe Service to process the webhook
+    return this.stripeService.handleWebhook(req.body, signature);
+  }
+    
 }

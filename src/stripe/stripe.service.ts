@@ -1,18 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import Stripe from 'stripe';
 import { ConfigService } from '@nestjs/config';
+import { UsersRepository } from 'src/database/users.repository';
 
 @Injectable()
 export class StripeService {
     private stripe: Stripe
 
-    constructor(private configService: ConfigService){
+    constructor(private configService: ConfigService, private usersRepository: UsersRepository,){
         this.stripe = new Stripe(this.configService.get<string>('STRIPE_SECRET_KEY'),{
             apiVersion: '2024-12-18.acacia'
         })
     }
 
-    async createCheckoutSession(amount: number, paymentPeriod: string): Promise<string> {
+    async createCheckoutSession(amount: number, paymentPeriod: string, userId: string): Promise<string> {
         try {
           const session = await this.stripe.checkout.sessions.create({
             // payment_method_types: ['card', 'acss_debit','affirm','amazon_pay','wechat_pay','alipay', 'cashapp','alipay'],
@@ -65,30 +66,32 @@ export class StripeService {
         return session.url;
       } catch (error) {
         console.error("Error creating Stripe Checkout session:", error);
+  }
+  
+  async handleWebhook(payload: any, signature: string): Promise<void> {
+    try {
+      const event = this.stripe.webhooks.constructEvent(
+        payload,
+        signature,
+        this.configService.get<string>('STRIPE_WEBHOOK_SECRET'),
+      );
+
+      if (event.type === 'checkout.session.completed') {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const userId = session.metadata.userId; // Pass userId as metadata when creating sessions
+
+        // Calculate plan expiry (1 minute from now)
+        const expiryTimestamp = new Date(Date.now() + 1 * 60 * 1000);
+
+        // Update the user's plan expiry in the database
+        await this.usersRepository.updateUserPlan(userId, {
+          planExpiry: expiryTimestamp,
+          email: session.customer_email, // Retrieve customer email from session
+        });
       }
-      }
-
-
-      // async createPaymentIntent(
-      //   amount: number,
-      //   currency: string,
-      //   paymentMethodConfigurationId: string,
-      // ) {
-      //   try {
-      //     const paymentIntent = await this.stripe.paymentIntents.create({
-      //       payment_method_options:{
-
-      //         amount: amount * 100, // Amount in the smallest unit
-      //         currency: currency,
-      //         payment_method_configuration: paymentMethodConfigurationId, // Add your payment method ID here
-      //         confirm: true, // Immediately confirm the payment if possible
-      //       }
-      //     });
-    
-      //     return paymentIntent;
-      //   } catch (error) {
-      //     console.error('Error creating PaymentIntent:', error);
-      //     throw error;
-      //   }
-      // }
-// }
+    } catch (error) {
+      console.error('Error handling Stripe webhook:', error);
+      throw error;
+    }
+  }
+}
